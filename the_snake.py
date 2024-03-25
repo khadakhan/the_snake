@@ -50,25 +50,26 @@ NEXT_DIR_DIC = {(LEFT, pg.K_UP): UP,
                 (UP, pg.K_RIGHT): RIGHT,
                 (DOWN, pg.K_RIGHT): RIGHT}
 
-# Описание классов игры.
-
 
 class GameObject:
     """Класс GameObject является родительским классом для всех элементов
     игры.
     """
 
-    def __init__(self, position=GAME_OBJECT_POSITION,
-                 body_color=(0, 0, 0)):
-        self.position = position
+    def __init__(self, body_color=BOARD_BACKGROUND_COLOR):
+        self.position = GAME_OBJECT_POSITION
         self.body_color = body_color
         self.speed = 10
 
     def draw(self):
-        """Абстрактный метод, предназначенный для переопределения в дочерних
-        классах.
+        """Абстрактный метод, предназначенный для переопределения
+        в дочерних классах.
         """
-        raise NotImplementedError
+        try:
+            raise NotImplementedError
+        except NotImplementedError:
+            print(f'В классе {self.__class__.__name__} не'
+                  'переопределен абстрактный метод базового класса')
 
     def draw_rect(self, position, body_color):
         """Метод отрисовывает квадратик"""
@@ -90,11 +91,11 @@ class Apple(GameObject):
         """Метод для установления случайного положения яблока
         с учетом положения змейки.
         """
-        self.position = ((randint(0, GRID_WIDTH - 1) * GRID_SIZE,
-                         randint(0, GRID_HEIGHT - 1) * GRID_SIZE))
-        while self.position in snake_positions:
-            self.position = ((randint(0, GRID_WIDTH - 1) * GRID_SIZE,
-                             randint(0, GRID_HEIGHT - 1) * GRID_SIZE))
+        while True:
+            self.position = (randint(0, GRID_WIDTH - 1) * GRID_SIZE,
+                             randint(0, GRID_HEIGHT - 1) * GRID_SIZE)
+            if self.position not in snake_positions:
+                break
 
     def draw(self):
         """Метод отрисовывает яблоко на игровой поверхности."""
@@ -126,10 +127,15 @@ class Snake(GameObject):
         """
         old_head_position_w, old_head_position_h = self.get_head_position()
         direction_w, direction_h = self.direction
-        return ((old_head_position_w + direction_w
-                 * GRID_SIZE) % SCREEN_WIDTH,
-                (old_head_position_h + direction_h
-                 * GRID_SIZE) % SCREEN_HEIGHT)
+        new_head_position = ((old_head_position_w + direction_w
+                              * GRID_SIZE) % SCREEN_WIDTH,
+                             (old_head_position_h + direction_h
+                              * GRID_SIZE) % SCREEN_HEIGHT)
+        self.positions.insert(0, new_head_position)
+        if len(self.positions) > self.length:
+            self.last = self.positions.pop(-1)
+        else:
+            self.last = None
 
     def draw(self):
         """Метод отрисовывает змейку на экране, затирая след."""
@@ -181,24 +187,18 @@ def main():
     # Тут нужно создать экземпляры классов.
     snake = Snake()
     apple = Apple(snake.positions)
-
     while True:
         clock.tick(snake.speed)
         handle_keys(snake)
         snake.update_direction()
-        new_head_position = snake.move()
-        if new_head_position in snake.positions[2:]:
+        snake.move()
+        if snake.get_head_position() in snake.positions[2:]:
             snake.reset()
             screen.fill(BOARD_BACKGROUND_COLOR)
-        else:
-            snake.positions.insert(0, new_head_position)
-            if len(snake.positions) > snake.length:
-                snake.last = snake.positions.pop(-1)
-            else:
-                snake.last = None
+            apple.randomize_position(snake.positions)
         if snake.get_head_position() == apple.position:
             snake.length += 1
-            apple.__init__(snake.positions)
+            apple.randomize_position(snake.positions)
         apple.draw()
         snake.draw()
         pg.display.update()
