@@ -2,9 +2,6 @@ from random import choice, randint
 
 import pygame as pg
 
-# # Инициализация pg:
-# pg.init()
-
 # Константы для размеров поля и сетки:
 SCREEN_WIDTH, SCREEN_HEIGHT = 640, 480
 GRID_SIZE = 20
@@ -29,6 +26,9 @@ APPLE_COLOR = (255, 0, 0)
 
 # Цвет змейки
 SNAKE_COLOR = (0, 255, 0)
+
+# Цвет камня
+STONE_COLOR = (224, 224, 224)
 
 # Настройка игрового окна:
 screen = pg.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), 0, 32)
@@ -65,11 +65,9 @@ class GameObject:
         """Абстрактный метод, предназначенный для переопределения
         в дочерних классах.
         """
-        try:
-            raise NotImplementedError
-        except NotImplementedError:
-            print(f'В классе {self.__class__.__name__} не'
-                  'переопределен абстрактный метод базового класса')
+        raise NotImplementedError(f'В классе {self.__class__.__name__} не'
+                                  'переопределен абстрактный метод базового'
+                                  'класса')
 
     def draw_rect(self, position, body_color):
         """Метод отрисовывает квадратик"""
@@ -78,23 +76,49 @@ class GameObject:
         pg.draw.rect(screen, BORDER_COLOR, rect, 1)
 
 
-class Apple(GameObject):
-    """Класс Apple описывает яблоко и наследуется от класса
+class Stone(GameObject):
+    """Класс Stone описывает камень и наследуется от класса
     GameObject.
     """
 
-    def __init__(self, snake_positions=[]):
-        super().__init__(body_color=APPLE_COLOR)
-        self.randomize_position(snake_positions)
+    def __init__(self, snake_positions, apple_position):
+        super().__init__(body_color=STONE_COLOR)
+        self.randomize_position(snake_positions or [], apple_position or None)
 
-    def randomize_position(self, snake_positions):
+    def randomize_position(self, snake_positions, apple_position):
         """Метод для установления случайного положения яблока
         с учетом положения змейки.
         """
         while True:
             self.position = (randint(0, GRID_WIDTH - 1) * GRID_SIZE,
                              randint(0, GRID_HEIGHT - 1) * GRID_SIZE)
-            if self.position not in snake_positions:
+            if ((self.position not in snake_positions)
+                    and (self.position != apple_position)):
+                break
+
+    def draw(self):
+        """Метод отрисовывает камень на игровой поверхности."""
+        self.draw_rect(self.position, self.body_color)
+
+
+class Apple(GameObject):
+    """Класс Apple описывает яблоко и наследуется от класса
+    GameObject.
+    """
+
+    def __init__(self, snake_positions):
+        super().__init__(body_color=APPLE_COLOR)
+        self.randomize_position(snake_positions or [])
+
+    def randomize_position(self, snake_positions, stone_position=None):
+        """Метод для установления случайного положения яблока
+        с учетом положения змейки.
+        """
+        while True:
+            self.position = (randint(0, GRID_WIDTH - 1) * GRID_SIZE,
+                             randint(0, GRID_HEIGHT - 1) * GRID_SIZE)
+            if ((self.position not in snake_positions)
+                    and (self.position != stone_position)):
                 break
 
     def draw(self):
@@ -139,12 +163,12 @@ class Snake(GameObject):
 
     def draw(self):
         """Метод отрисовывает змейку на экране, затирая след."""
-        # Отрисовка головы змейки
-        self.draw_rect(self.get_head_position(), self.body_color)
         # Затирание последнего сегмента
         if self.last:
             last_rect = pg.Rect(self.last, (GRID_SIZE, GRID_SIZE))
             pg.draw.rect(screen, BOARD_BACKGROUND_COLOR, last_rect)
+        # Отрисовка головы змейки
+        self.draw_rect(self.get_head_position(), self.body_color)
 
     def get_head_position(self):
         """Метод возвращает позицию головы змейки."""
@@ -170,11 +194,11 @@ def handle_keys(game_object):
                 pg.quit()
                 raise SystemExit
             elif event.key == pg.K_s:
-                if 5 <= game_object.speed <= 50:
-                    game_object.speed += 5
+                if 1 <= game_object.speed <= 19:
+                    game_object.speed += 1
             elif event.key == pg.K_d:
-                if 10 <= game_object.speed <= 55:
-                    game_object.speed -= 5
+                if 2 <= game_object.speed <= 20:
+                    game_object.speed -= 1
             game_object.next_direction = NEXT_DIR_DIC.get((game_object
                                                            .direction,
                                                            event.key))
@@ -187,20 +211,26 @@ def main():
     # Тут нужно создать экземпляры классов.
     snake = Snake()
     apple = Apple(snake.positions)
+    stone = Stone(snake.positions, apple.position)
     while True:
         clock.tick(snake.speed)
         handle_keys(snake)
         snake.update_direction()
         snake.move()
-        if snake.get_head_position() in snake.positions[2:]:
+        if snake.get_head_position() in snake.positions[4:]:
             snake.reset()
             screen.fill(BOARD_BACKGROUND_COLOR)
-            apple.randomize_position(snake.positions)
+            apple.randomize_position(snake.positions, stone.position)
         if snake.get_head_position() == apple.position:
             snake.length += 1
-            apple.randomize_position(snake.positions)
+            apple.randomize_position(snake.positions, stone.position)
+        if snake.get_head_position() == stone.position:
+            snake.reset()
+            screen.fill(BOARD_BACKGROUND_COLOR)
+            stone.randomize_position(snake.positions, stone.position)
         apple.draw()
         snake.draw()
+        stone.draw()
         pg.display.update()
 
 
